@@ -13,7 +13,6 @@ from aiogram.types import (
     CallbackQuery,
 )
 from db import session, User, Artist, Subscription
-from datetime import datetime
 from release_checker import test_notifications
 
 dp = Dispatcher()
@@ -28,6 +27,23 @@ async def command_start(message: Message):
 async def send_test_notifications(message: Message, bot: Bot):
     await test_notifications(bot)
     await message.answer("Тестовые уведомления отправлены!")
+
+
+@dp.message(Command("my_subs"))
+async def my_subs(message: Message):
+    subscriptions = session.query(Subscription).all()
+    send_message = "Ваши подписки:\n\n"
+    for subscription in subscriptions:
+        artist = session.query(Artist).filter_by(id=subscription.artist_id).first()
+        if not artist:
+            continue
+        ym_artists = client.artists(artist.id)
+        if not ym_artists:
+            continue
+
+        send_message += f'<a href="https://music.yandex.ru/artist/{ym_artists[0].id}">{ym_artists[0].name}</a>\n'
+
+    await message.answer(send_message, disable_web_page_preview=True)
 
 
 @dp.message()
@@ -55,8 +71,9 @@ async def search_artist_handler(message: Message):
             ]
         )
         await message.answer(
-            f"{artist['name']}\n[Перейти к артисту]({artist['url']})",
+            f'{artist['name']} - <a href="{artist['url']}">Перейти к артисту</a>',
             reply_markup=keyboard,
+            disable_web_page_preview=True,
         )
     else:
         await message.answer("Артист не найден.")
